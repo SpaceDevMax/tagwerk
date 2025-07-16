@@ -58,7 +58,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
                         ),
                       ),
-                      subtitle: Text(todo?['description'] ?? ''),
+                      subtitle: Text(
+                        todo?['description'] ?? '',
+                        style: TextStyle(
+                          decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
                       leading: Checkbox(
                         value: todo?['isDone'] ?? false,
                         onChanged: (value) {

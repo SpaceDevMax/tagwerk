@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-
-import 'task.dart';
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -13,26 +10,30 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Task> _tasks = [];
   final TextEditingController _textController = TextEditingController();
-  void _addTask() async {
-      final taskTitle = _textController.text;
+  final TextEditingController _descriptionController = TextEditingController();
+  late Box<Map> _todoBox;
+
+  @override
+  void initState() {
+    super.initState();
+    _todoBox = Hive.box<Map>('todos');
+  }
+
+  void _addTask() {
     if (_textController.text.isNotEmpty) {
-      setState(() {
-        _tasks.add(Task(_textController.text));
-      });
-      final todoBox = await Hive.openBox<Map>('todos');
       final todoMap = {
-        'title': taskTitle,
-        'description': 'Description',
+        'title': _textController.text,
+        'description': _descriptionController.text,
+        'isDone': false,
       };
-      todoBox.add(todoMap);
-      for (var i = 0; i < todoBox.length; i++) {
-        print('Todo #$i: ${todoBox.getAt(i)}');
+      _todoBox.add(todoMap);
+      for (var i = 0; i < _todoBox.length; i++) {
+        print('Todo #$i: ${_todoBox.getAt(i)}');
       }
       _textController.clear();
+      _descriptionController.clear();
     }
-
   }
 
   @override
@@ -41,45 +42,42 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('TODO App'),
       ),
-      body: _tasks.isEmpty
-          ? const Center(child: Text('No tasks yet. Add one!'))
-          : ValueListenableBuilder(
-            valueListenable: Hive.box<Map>('todos').listenable(),
-            builder: (context, Box<Map> box, _) {
-              return ListView.builder(
-                  itemCount: _tasks.length,
+      body: ValueListenableBuilder(
+        valueListenable: _todoBox.listenable(),
+        builder: (context, Box<Map> box, _) {
+          return box.isEmpty
+              ? const Center(child: Text('No tasks yet. Add one!'))
+              : ListView.builder(
+                  itemCount: box.length,
                   itemBuilder: (context, index) {
                     final todo = box.getAt(index);
-                    final task = _tasks[index];
                     return ListTile(
                       title: Text(
-                        task.title,
+                        todo?['title'] ?? '',
                         style: TextStyle(
-                          decoration: task.isDone ? TextDecoration.lineThrough : null,
+                          decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
                         ),
                       ),
-                      //subtitle: Text(todo?['description'] ?? ''),
+                      subtitle: Text(todo?['description'] ?? ''),
                       leading: Checkbox(
-                        value: task.isDone,
+                        value: todo?['isDone'] ?? false,
                         onChanged: (value) {
-                          setState(() {
-                            task.isDone = value!;
-                          });
+                          final updatedTodo = Map<String, dynamic>.from(todo ?? {});
+                          updatedTodo['isDone'] = value ?? false;
+                          box.putAt(index, updatedTodo);
                         },
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
                         onPressed: () {
-                          setState(() {
-                            _tasks.removeAt(index);
-                          });
+                          box.deleteAt(index);
                         },
                       ),
                     );
                   },
                 );
-            }
-          ),
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
@@ -87,10 +85,19 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context) {
               return AlertDialog(
                 title: const Text('Add Task'),
-                content: TextField(
-                  controller: _textController,
-                  decoration: const InputDecoration(hintText: 'Enter task title'),
-                  autofocus: true,
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _textController,
+                      decoration: const InputDecoration(hintText: 'Enter task title'),
+                      autofocus: true,
+                    ),
+                    TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(hintText: 'Enter description'),
+                    ),
+                  ],
                 ),
                 actions: [
                   TextButton(
@@ -100,10 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Text('Cancel'),
                   ),
                   TextButton(
-                    onPressed: () async {
+                    onPressed: () {
                       _addTask();
                       Navigator.of(context).pop();
-
                     },
                     child: const Text('Add'),
                   ),
@@ -120,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _textController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 }

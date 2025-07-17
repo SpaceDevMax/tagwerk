@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'empty_screen.dart';
+import '../widgets/todo_builder.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,30 +24,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _todoBox = Hive.box<Map>('todos');
   }
 
-  void _addTask() {
-    if (_textController.text.isNotEmpty) {
-      final todoMap = {
-        'title': _textController.text,
-        'description': _descriptionController.text,
-        'isDone': false,
-      };
-      _todoBox.add(todoMap);
-      //for (var i = 0; i < _todoBox.length; i++) {
-        //print('Todo #$i: ${_todoBox.getAt(i)}');
-      //}
-      _textController.clear();
-      _descriptionController.clear();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     Widget page;
     switch (selectedIndex) {
       case 0:
-        page = TodoBuilder(todoBox: _todoBox);
+        page = TodoBuilder(
+          todoBox: _todoBox,
+          filter: (todo) {
+            if (todo?['isDone'] == true) return false;
+            final dueMs = todo?['dueDate'] as int?;
+            if (dueMs == null) return false;
+            final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
+            final now = DateTime.now();
+            return due.year == now.year && due.month == now.month && due.day == now.day;
+          },
+        );
       case 1:
-        page = TodoBuilder(todoBox: _todoBox);
+        page = TodoBuilder(
+          todoBox: _todoBox,
+          filter: (todo) => todo?['isDone'] == true,
+        );
       case 2:
         page = EmptyScreen();
       default:
@@ -64,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SafeArea(
                 child: NavigationRail(
                   extended: constraints.maxWidth >=600,
-                  destinations: [
+                  destinations: const [
                     NavigationRailDestination(icon: Icon(Icons.home), label: Text('Home')),
                     NavigationRailDestination(icon: Icon(Icons.check_box), label: Text('Done')),
                     NavigationRailDestination(icon: Icon(Icons.circle), label: Text('Empty')),
@@ -80,8 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               ),
               Expanded(
-                  child:
-                    page,
+                  child: page,
               ),
 
             ]
@@ -91,37 +88,84 @@ class _HomeScreenState extends State<HomeScreen> {
                   showDialog(
                     context: context,
                     builder: (context) {
-                      return AlertDialog(
-                        title: const Text('Add Task'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextField(
-                              controller: _textController,
-                              decoration: const InputDecoration(hintText: 'Enter task title'),
-                              autofocus: true,
+                      DateTime? selectedDate;
+                      return StatefulBuilder(
+                        builder: (BuildContext dialogContext, StateSetter dialogSetState) {
+
+                          return AlertDialog(
+                            title: const Text('Add Task'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(
+                                  controller: _textController,
+                                  decoration: const InputDecoration(hintText: 'Enter task title'),
+                                  autofocus: true,
+                                ),
+                                TextField(
+                                  controller: _descriptionController,
+                                  decoration: const InputDecoration(hintText: 'Enter description'),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Builder(
+                                      builder: (context) {
+                                        String dateText;
+                                        if (selectedDate == null) {
+                                          dateText = 'No due date selected (required)';
+                                        } else {
+                                          dateText = 'Due: ${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+                                        }
+                                        return Text(dateText);
+                                      },
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final picked = await showDatePicker(
+                                          context: dialogContext,
+                                          initialDate: DateTime.now(),
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime(2100),
+                                        );
+                                        if (picked != null) {
+                                          dialogSetState(() => selectedDate = picked);
+                                        }
+                                      },
+                                      child: const Text('Pick Date'),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            TextField(
-                              controller: _descriptionController,
-                              decoration: const InputDecoration(hintText: 'Enter description'),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              _addTask();
-                              Navigator.of(context).pop();
-                            },
-                            child: const Text('Add'),
-                          ),
-                        ],
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  if (_textController.text.isNotEmpty && selectedDate != null) {
+                                    final todoMap = {
+                                      'title': _textController.text,
+                                      'description': _descriptionController.text,
+                                      'isDone': false,
+                                      'dueDate': selectedDate!.millisecondsSinceEpoch,
+                                    };
+                                    _todoBox.add(todoMap);
+                                    _textController.clear();
+                                    _descriptionController.clear();
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                                child: const Text('Add'),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   );
@@ -142,56 +186,3 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class TodoBuilder extends StatelessWidget {
-  const TodoBuilder({
-    super.key,
-    required Box<Map> todoBox,
-  }) : _todoBox = todoBox;
-
-  final Box<Map> _todoBox;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: _todoBox.listenable(),
-      builder: (context, Box<Map> box, _) {
-        return box.isEmpty
-            ? const Center(child: Text('No tasks yet. Add one!'))
-            : ListView.builder(
-                itemCount: box.length,
-                itemBuilder: (context, index) {
-                  final todo = box.getAt(index);
-                  return ListTile(
-                    title: Text(
-                      todo?['title'] ?? '',
-                      style: TextStyle(
-                        decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    subtitle: Text(
-                      todo?['description'] ?? '',
-                      style: TextStyle(
-                        decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    leading: Checkbox(
-                      value: todo?['isDone'] ?? false,
-                      onChanged: (value) {
-                        final updatedTodo = Map<String, dynamic>.from(todo ?? {});
-                        updatedTodo['isDone'] = value ?? false;
-                        box.putAt(index, updatedTodo);
-                      },
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () {
-                        box.deleteAt(index);
-                      },
-                    ),
-                  );
-                },
-              );
-      },
-                    );
-  }
-}

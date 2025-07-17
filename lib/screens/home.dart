@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-
-import 'empty_screen.dart';
-import '../widgets/todo_builder.dart';
+import '../services/export_to_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,13 +11,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  late Box<Map> _todoBox;
+  final TodoService _todoService = TodoService();
   var selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _todoBox = Hive.box<Map>('todos');
   }
 
   @override
@@ -30,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (selectedIndex) {
       case 0:
         page = TodoBuilder(
-          todoBox: _todoBox,
+          todoBox: _todoService.todoBox,
           filter: (todo) {
             if (todo?['isDone'] == true) return false;
             final dueMs = todo?['dueDate'] as int?;
@@ -42,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       case 1:
         page = TodoBuilder(
-          todoBox: _todoBox,
+          todoBox: _todoService.todoBox,
           filter: (todo) => todo?['isDone'] == true,
         );
       case 2:
@@ -155,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       'isDone': false,
                                       'dueDate': selectedDate!.millisecondsSinceEpoch,
                                     };
-                                    _todoBox.add(todoMap);
+                                    _todoService.todoBox.add(todoMap);
                                     _textController.clear();
                                     _descriptionController.clear();
                                     Navigator.of(context).pop();

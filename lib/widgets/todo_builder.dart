@@ -4,8 +4,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../services/todo_service.dart';
 import '../widgets/task_dialog.dart';
 
-
-
 class TodoBuilder extends StatelessWidget {
   const TodoBuilder({
     super.key,
@@ -14,7 +12,6 @@ class TodoBuilder extends StatelessWidget {
     this.comparator,
   });
 
-  
   final TodoService todoService;
   final bool Function(Map? todo)? filter;
   final int Function(Map, Map)? comparator;
@@ -59,6 +56,13 @@ class TodoBuilder extends StatelessWidget {
                     dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
                   }
 
+                  int? groupId = todo?['groupId'] as int?;
+                  Color? taskColor;
+                  if (groupId != null) {
+                    final group = todoService.groupBox.getAt(groupId);
+                    taskColor = group != null ? Color(group['color'] as int) : null;
+                  }
+
                   return ListTile(
                     title: Text(
                       todo?['title'] ?? '',
@@ -72,21 +76,37 @@ class TodoBuilder extends StatelessWidget {
                         decoration: todo?['isDone'] == true ? TextDecoration.lineThrough : null,
                       ),
                     ),
-                    leading: Checkbox(
-                      value: todo?['isDone'] ?? false,
-                      onChanged: (value) {
-                        final updatedTodo = Map<String, dynamic>.from(todo ?? {});
-                        final newIsDone = value ?? false;
-                        updatedTodo['isDone'] = value ?? false;
-                        if (newIsDone) {
-                          if (updatedTodo['completedAt'] == null) {
-                            updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                          }
-                        } else {
-                          updatedTodo['completedAt'] = null;  // Reset when unchecked
-                        }
-                        box.putAt(realIndex, updatedTodo);
-                      },
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (taskColor != null) ...[
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: taskColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Checkbox(
+                          value: todo?['isDone'] ?? false,
+                          onChanged: (value) {
+                            final updatedTodo = Map<String, dynamic>.from(todo ?? {});
+                            final newIsDone = value ?? false;
+                            updatedTodo['isDone'] = newIsDone;
+                            if (newIsDone) {
+                              if (updatedTodo['completedAt'] == null) {
+                                updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
+                              }
+                            } else {
+                              updatedTodo['completedAt'] = null;  // Reset when unchecked
+                            }
+                            box.putAt(realIndex, updatedTodo);
+                          },
+                        ),
+                      ],
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -96,15 +116,18 @@ class TodoBuilder extends StatelessWidget {
                           onPressed: () {
                             final initialDue = dueMs != null ? DateTime.fromMillisecondsSinceEpoch(dueMs) : null;
                             TaskDialog(
+                              todoService: todoService,
                               initialTitle: todo?['title'],
                               initialDescription: todo?['description'],
                               initialDueDate: initialDue,
-                              onSave: (title, description, dueDate) {
-                                todoService.editTask(realIndex, title, description, dueDate);
+                              initialGroupId: todo?['groupId'],
+                              onSave: (title, description, dueDate, groupId) {
+                                todoService.editTask(realIndex, title, description, dueDate, groupId);
                               },
                               dialogTitle: 'Edit Task',
                               saveButtonText: 'Update',
-                            ).show(context);                          },
+                            ).show(context);                          
+                          },
                         ),
                         IconButton( 
                           icon: const Icon(Icons.delete),

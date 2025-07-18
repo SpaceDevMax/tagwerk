@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../services/todo_service.dart';
+import '../widgets/group_dialog.dart';
+ 
+
 class TaskDialog extends StatelessWidget {
+  final TodoService todoService;
   final String? initialTitle;
   final String? initialDescription;
   final DateTime? initialDueDate;
-  final void Function(String title, String description, DateTime dueDate) onSave;
+  final int? initialGroupId;
+  final void Function(String title, String description, DateTime dueDate, int? groupId) onSave;
   final String dialogTitle;
   final String saveButtonText;
 
   const TaskDialog({
     super.key,
+    required this.todoService,
     this.initialTitle,
     this.initialDescription,
     this.initialDueDate,
+    this.initialGroupId,
     required this.onSave,
     this.dialogTitle = 'Add Task',
     this.saveButtonText = 'Add',
@@ -22,6 +30,7 @@ class TaskDialog extends StatelessWidget {
     final TextEditingController titleController = TextEditingController(text: initialTitle ?? '');
     final TextEditingController descriptionController = TextEditingController(text: initialDescription ?? '');
     DateTime? selectedDate = initialDueDate;
+    int? selectedGroupId = initialGroupId;
 
     showDialog(
       context: context,
@@ -67,6 +76,46 @@ class TaskDialog extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  DropdownButton<int?>(
+                    value: selectedGroupId,
+                    hint: const Text('Select Group'),
+                    items: todoService.getGroups().asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      Map<String, dynamic> group = entry.value;
+                      return DropdownMenuItem<int?>(
+                        value: idx,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 16,
+                              height: 16,
+                              color: Color(group['color'] as int),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(group['name'] as String),
+                          ],
+                        ),
+                      );
+                    }).toList()
+                      ..add(const DropdownMenuItem<int?>(value: null, child: Text('No Group')))
+                      ..add(const DropdownMenuItem<int?>(value: -1, child: Text('Create New Group'))),
+                    onChanged: (value) {
+                      if (value == -1) {
+                        GroupDialog(
+                          todoService: todoService,
+                          onSave:(name, color) {
+                            todoService.addGroup(name, color);
+                            dialogSetState((){
+                              selectedGroupId = todoService.groupBox.length - 1;
+                            });
+                          },
+                        ).show(dialogContext);
+                      } else {
+                      dialogSetState(() => selectedGroupId = value);
+                      }
+                    },
+                  ),
                 ],
               ),
               actions: [
@@ -83,6 +132,7 @@ class TaskDialog extends StatelessWidget {
                         titleController.text,
                         descriptionController.text,
                         selectedDate!,
+                        selectedGroupId,
                       );
                       Navigator.of(outerContext).pop();
                     }

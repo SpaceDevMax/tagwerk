@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/export_to_home_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,10 +22,66 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Widget page;
-    switch (selectedIndex) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Tagwerk'),
+          ),
+          body: Row(
+            children: [
+              SafeArea(
+                child: ValueListenableBuilder(
+                  valueListenable: _todoService.groupBox.listenable(),
+                  builder: (context, Box<Map> groupBox, _) {
+                    final groups = _todoService.getGroups();
+                    final destinations = <NavigationRailDestination>[
+                      const NavigationRailDestination(icon: Icon(Icons.home), label: Text('Today')),
+                      const NavigationRailDestination(icon: Icon(Icons.circle), label: Text('Open')),
+                      const NavigationRailDestination(icon: Icon(Icons.check_box), label: Text('Done')),
+                    ] + groups.map((group) => NavigationRailDestination(
+                      icon: Icon(Icons.circle, color: Color(group['color'] as int)),
+                      label: Text(group['name'] as String),
+                    )).toList();
+
+                    return NavigationRail(
+                      extended: constraints.maxWidth >= 600,
+                      destinations: destinations,
+                      selectedIndex: selectedIndex,
+                      onDestinationSelected: (value) {
+                        setState(() {
+                          selectedIndex = value;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              Expanded(
+                child: _buildPage(selectedIndex),
+              ),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              TaskDialog(
+                todoService: _todoService,
+                onSave: (title, description, dueDate, groupId) {
+                  _todoService.addTask(title, description, dueDate, groupId);
+                },
+              ).show(context);
+            },
+            child: const Icon(Icons.add),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPage(int index) {
+    switch (index) {
       case 0:
-      page = TodoBuilder(
+        return TodoBuilder(
           todoService: _todoService,
           filter: (todo) {
             final dueMs = todo?['dueDate'] as int?;
@@ -45,70 +102,23 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       case 1:
-        page = TodoBuilder(
+        return TodoBuilder(
           todoService: _todoService,
           filter: (todo) => todo?['isDone'] == false,
-
-          );
+        );
       case 2:
-        page = TodoBuilder(
+        return TodoBuilder(
           todoService: _todoService,
           filter: (todo) => todo?['isDone'] == true,
           comparator: (a, b) => (b['completedAt'] as int? ?? 0).compareTo(a['completedAt'] as int? ?? 0),
         );
-      case 3:
-        page = EmptyScreen();
       default:
-        throw UnimplementedError('no widget for $selectedIndex');   
-    }
-    
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Tagwerk'),
-          ),
-          body: Row(
-            children: [
-              SafeArea(
-                child: NavigationRail(
-                  extended: constraints.maxWidth >=600,
-                  destinations: const [
-                    NavigationRailDestination(icon: Icon(Icons.home), label: Text('Today')),
-                    NavigationRailDestination(icon: Icon(Icons.circle), label: Text('All')),
-                    NavigationRailDestination(icon: Icon(Icons.check_box), label: Text('Done')),
-                    NavigationRailDestination(icon: Icon(Icons.circle), label: Text('Empty')),
-
-                  ],
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: (value) {
-                    setState(() {
-                      selectedIndex = value;
-                    });
-                  }
-
-                )
-              ),
-              Expanded(
-                  child: page,
-              ),
-
-            ]
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              TaskDialog(
-                onSave: (title, description, dueDate) {
-                  _todoService.addTask(title, description, dueDate);
-                },
-              ).show(context);
-            },
-            child: const Icon(Icons.add),
-          ),
+        final groupIndex = index - 3;
+        return TodoBuilder(
+          todoService: _todoService,
+          filter: (todo) => todo?['groupId'] == groupIndex,
         );
-            
-      }
-    );
+    }
   }
 
   @override
@@ -118,4 +128,3 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 }
-

@@ -13,20 +13,45 @@ class TodoService {
   TodoService() {
     _todoBox = Hive.box<Map>('todos');
     _groupBox = Hive.box<Map>('groups');
+    _migrateTodos();  // Add this call to run migration on init
   }
 
   Box<Map> get todoBox => _todoBox;
   Box<Map> get groupBox => _groupBox;
 
+  void _migrateTodos() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (int i = 0; i < _todoBox.length; i++) {
+      final todo = _todoBox.getAt(i);
+      if (todo != null) {
+        final updatedTodo = Map<String, dynamic>.from(todo);
+        bool changed = false;
+        if (updatedTodo['id'] == null) {
+          updatedTodo['id'] = '$now$i';  // Unique ID based on timestamp + index
+          changed = true;
+        }
+        if (updatedTodo['order'] == null) {
+          updatedTodo['order'] = now.toDouble() + i;  // Set order based on current position/timestamp
+          changed = true;
+        }
+        if (changed) {
+          _todoBox.putAt(i, updatedTodo);
+        }
+      }
+    }
+  }
+
   void addTask(String title, String description, DateTime dueDate, [int? groupId]) {
     if (title.isNotEmpty) {
       final todoMap = {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(), // Unique ID
         'title': title,
         'description': description,
         'isDone': false,
         'dueDate': dueDate.millisecondsSinceEpoch,
         'completedAt': null,
         'groupId': groupId,
+        'order': DateTime.now().millisecondsSinceEpoch.toDouble(),  // Add this line for sortable order
       };
       _todoBox.add(todoMap);
     }

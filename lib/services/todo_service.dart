@@ -37,6 +37,9 @@ class TodoService {
         if (changed) {
           _todoBox.putAt(i, updatedTodo);
         }
+        if (updatedTodo['savedDueDate'] == null) {
+          // No need to set, defaults to null
+        }
       }
     }
   }
@@ -88,6 +91,34 @@ void updateIsDone(int index, bool isDone) {
       updated['completedAt'] = null;
     }
     updated['isDone'] = isDone;
+    _todoBox.putAt(index, updated);
+  }
+}
+
+void toggleDueToday(int index) {
+  final current = _todoBox.getAt(index);
+  if (current != null) {
+    final updated = Map<String, dynamic>.from(current);
+    final dueMs = updated['dueDate'] as int?;
+    final savedMs = updated['savedDueDate'] as int?;
+    final now = DateTime.now();
+    final todayMs = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    bool isDueToday = false;
+    if (dueMs != null) {
+      final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
+      isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
+    }
+    if (!isDueToday) {
+      updated['savedDueDate'] = dueMs;  // Save old due (null if none)
+      updated['dueDate'] = todayMs;
+    } else {
+      if (savedMs != null) {
+        updated['dueDate'] = savedMs;
+      } else {
+        updated['dueDate'] = null;  // For original today tasks, remove due date
+      }
+      updated.remove('savedDueDate');
+    }
     _todoBox.putAt(index, updated);
   }
 }

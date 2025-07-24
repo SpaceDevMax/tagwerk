@@ -16,6 +16,8 @@ class TodoBuilder extends StatelessWidget {
   final bool Function(Map? todo)? filter;
   final int Function(Map, Map)? comparator;
 
+  
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
@@ -95,6 +97,13 @@ class TodoBuilder extends StatelessWidget {
                         dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
                       }
 
+                      bool isDueToday = false;
+                      if (dueMs != null) {
+                        final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
+                        final now = DateTime.now();
+                        isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
+                      }
+
                       int? groupId = todo['groupId'] as int?;
                       Color? taskColor;
                       if (groupId != null) {
@@ -152,6 +161,12 @@ class TodoBuilder extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
+                              icon: Icon(isDueToday ? Icons.today : Icons.calendar_month_outlined),
+                              onPressed: () {
+                                todoService.toggleDueToday(realIndex);
+                              },
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.edit),
                               onPressed: () {
                                 final initialDue = dueMs != null ? DateTime.fromMillisecondsSinceEpoch(dueMs) : null;
@@ -175,6 +190,9 @@ class TodoBuilder extends StatelessWidget {
                                 todoService.deleteTask(realIndex);
                               },
                             ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 15.0),
+                            ),
                           ],
                         ),
                       );
@@ -193,6 +211,13 @@ class TodoBuilder extends StatelessWidget {
                       if (dueMs != null) {
                         final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
                         dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
+                      }
+
+                      bool isDueToday = false;
+                      if (dueMs != null) {
+                        final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
+                        final now = DateTime.now();
+                        isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
                       }
 
                       int? groupId = todo['groupId'] as int?;
@@ -251,6 +276,12 @@ class TodoBuilder extends StatelessWidget {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                              IconButton(
+                              icon: Icon(isDueToday ? Icons.today : Icons.calendar_month_outlined),
+                              onPressed: () {
+                                todoService.toggleDueToday(realIndex);
+                              },
+                            ),
                             IconButton(
                               icon: const Icon(Icons.edit),
                               onPressed: () {

@@ -119,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return TodoBuilder(
           todoService: _todoService,
           filter: (todo) => todo?['isDone'] == true,
-          comparator: (a, b) => (b['completedAt'] as int? ?? 0).compareTo(a['completedAt'] as int? ?? 0),
         );
       default:
         final groupIndex = index - 3;

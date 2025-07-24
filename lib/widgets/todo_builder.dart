@@ -77,8 +77,8 @@ class _TodoBuilderState extends State<TodoBuilder> {
                   },
                   items: const [
                     DropdownMenuItem(value: 'custom', child: Text('Custom')),
-                    DropdownMenuItem(value: 'created_desc', child: Text('Latest to Oldest')),
-                    DropdownMenuItem(value: 'created_asc', child: Text('Oldest to Latest')),
+                    DropdownMenuItem(value: 'created_desc', child: Text('Oldest to Latest')),
+                    DropdownMenuItem(value: 'created_asc', child: Text('Latest to Oldest')),
                     DropdownMenuItem(value: 'due_asc', child: Text('Due Next to Due Last')),
                   ],
                 ),

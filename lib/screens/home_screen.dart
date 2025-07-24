@@ -64,8 +64,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: () {
+              DateTime? preDue;
+              int? preGroup;
+              if (selectedIndex == 0) {
+                preDue = DateTime.now();
+              } else if (selectedIndex >= 3) {
+                preGroup = selectedIndex - 3;
+              }
               TaskDialog(
                 todoService: _todoService,
+                initialDueDate: preDue,
+                initialGroupId: preGroup,
                 onSave: (title, description, dueDate, groupId) {
                   _todoService.addTask(title, description, dueDate, groupId);
                 },

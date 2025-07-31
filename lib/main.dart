@@ -8,6 +8,7 @@ void main() async{
   await Hive.initFlutter();
   await Hive.openBox<Map>('todos');
   await Hive.openBox<Map>('groups');
+  await Hive.openBox<String>('settings');
   // Add any necessary Hive adapter registrations here
   runApp(const MyApp());
 }

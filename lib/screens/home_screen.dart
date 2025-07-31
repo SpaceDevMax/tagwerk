@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     final groups = _todoService.getGroups();
                     final destinations = <NavigationRailDestination>[
                       const NavigationRailDestination(icon: Icon(Icons.home), label: Text('Today')),
+                      const NavigationRailDestination(icon: Icon(Icons.warning), label: Text('Overdue')),
                       const NavigationRailDestination(icon: Icon(Icons.circle), label: Text('Open')),
                       const NavigationRailDestination(icon: Icon(Icons.check_box), label: Text('Done')),
                     ] + groups.map((group) => NavigationRailDestination(
@@ -68,8 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
               int? preGroup;
               if (selectedIndex == 0) {
                 preDue = DateTime.now();
-              } else if (selectedIndex >= 3) {
-                preGroup = selectedIndex - 3;
+              } else if (selectedIndex >= 4) {
+                preGroup = selectedIndex - 4;
               }
               TaskDialog(
                 todoService: _todoService,
@@ -109,22 +110,31 @@ class _HomeScreenState extends State<HomeScreen> {
             final completed = DateTime.fromMillisecondsSinceEpoch(completedMs);
             return completed.year == now.year && completed.month == now.month && completed.day == now.day;
           },
+          viewKey: 'today',
         );
       case 1:
-        return TodoBuilder(
-          todoService: _todoService,
-          filter: (todo) => todo?['isDone'] == false,
-        );
+        return OverdueScreen(todoService: _todoService);
+
       case 2:
         return TodoBuilder(
           todoService: _todoService,
-          filter: (todo) => todo?['isDone'] == true,
+          filter: (todo) => todo?['isDone'] == false,
+          viewKey: 'open',
         );
+
+      case 3:
+        return TodoBuilder(
+          todoService: _todoService,
+          filter: (todo) => todo?['isDone'] == true,
+          viewKey: 'done',
+        );
+
       default:
-        final groupIndex = index - 3;
+        final groupIndex = index - 4;
         return TodoBuilder(
           todoService: _todoService,
           filter: (todo) => todo?['groupId'] == groupIndex,
+          viewKey: 'group_$groupIndex',
         );
     }
   }

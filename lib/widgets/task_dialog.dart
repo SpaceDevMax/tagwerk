@@ -64,7 +64,9 @@ class TaskDialog extends StatelessWidget {
                         onPressed: () async {
                           final picked = await showDatePicker(
                             context: dialogContext,
-                            initialDate: selectedDate ?? DateTime.now(),
+                            initialDate: selectedDate != null && !selectedDate!.isBefore(DateTime.now())
+                                ? selectedDate!
+                                : DateTime.now(),
                             firstDate: DateTime.now(),
                             lastDate: DateTime(2100),
                           );

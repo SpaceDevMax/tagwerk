@@ -1,25 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-
 import '../services/todo_service.dart';
-import '../widgets/task_dialog.dart';
+import '../widgets/task_tile.dart'; // Added import
 
 class TodoBuilder extends StatefulWidget {
   const TodoBuilder({
     super.key,
     required this.todoService,
     this.filter,
+    required this.viewKey,
   });
 
   final TodoService todoService;
   final bool Function(Map? todo)? filter;
+  final String viewKey;
 
   @override
   State<TodoBuilder> createState() => _TodoBuilderState();
 }
 
 class _TodoBuilderState extends State<TodoBuilder> {
-  String _sortOption = 'due_asc';  // Default to due next to due last
+  late String _sortOption;
+
+  @override
+  void initState() {
+    super.initState();
+    _sortOption = widget.todoService.settingsBox.get('${widget.viewKey}_sort') ?? 'due_asc';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +55,11 @@ class _TodoBuilderState extends State<TodoBuilder> {
               return aOrder.compareTo(bOrder);
             }
             switch (_sortOption) {
-              case 'created_desc':  // Latest to oldest
+              case 'created_desc':
                 return int.parse(b['id'] as String).compareTo(int.parse(a['id'] as String));
-              case 'created_asc':  // Oldest to latest
+              case 'created_asc':
                 return int.parse(a['id'] as String).compareTo(int.parse(b['id'] as String));
-              case 'due_asc':  // Due next to due last (nulls last)
+              case 'due_asc':
                 final large = 9223372036854775807;
                 final aDue = a['dueDate'] as int? ?? large;
                 final bDue = b['dueDate'] as int? ?? large;
@@ -73,6 +80,8 @@ class _TodoBuilderState extends State<TodoBuilder> {
                   onChanged: (newValue) {
                     setState(() {
                       _sortOption = newValue!;
+                      widget.todoService.settingsBox.put('${widget.viewKey}_sort', _sortOption);
+                      widget.todoService.settingsBox.flush();
                     });
                   },
                   items: const [
@@ -120,111 +129,13 @@ class _TodoBuilderState extends State<TodoBuilder> {
                           itemBuilder: (context, idx) {
                             final int realIndex = filteredIndices[idx];
                             final todo = box.getAt(realIndex)!;
-                            String dueStr = '';
-                            final dueMs = todo['dueDate'] as int?;
-                            if (dueMs != null) {
-                              final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
-                              dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
-                            }
-
-                            bool isDueToday = false;
-                            if (dueMs != null) {
-                              final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
-                              final now = DateTime.now();
-                              isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
-                            }
-
-                            int? groupId = todo['groupId'] as int?;
-                            Color? taskColor;
-                            if (groupId != null) {
-                              final group = widget.todoService.groupBox.getAt(groupId);
-                              taskColor = group != null ? Color(group['color'] as int) : null;
-                            }
-
-                            return ListTile(
+                            return TaskTile(
                               key: ValueKey(todo['id']),
-                              title: Text(
-                                todo['title'] ?? '',
-                                style: TextStyle(
-                                  decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                              subtitle: Text(
-                                (todo['description'] ?? '') + dueStr,
-                                style: TextStyle(
-                                  decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                              leading: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (taskColor != null) ...[
-                                    Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: taskColor,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  Checkbox(
-                                    value: todo['isDone'] ?? false,
-                                    onChanged: (value) {
-                                      final updatedTodo = Map<String, dynamic>.from(todo);
-                                      final newIsDone = value ?? false;
-                                      updatedTodo['isDone'] = newIsDone;
-                                      if (newIsDone) {
-                                        if (updatedTodo['completedAt'] == null) {
-                                          updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                                        }
-                                      } else {
-                                        updatedTodo['completedAt'] = null;
-                                      }
-                                      box.putAt(realIndex, updatedTodo);
-                                    },
-                                  ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(isDueToday ? Icons.today : Icons.calendar_month_outlined),
-                                    onPressed: () {
-                                      widget.todoService.toggleDueToday(realIndex);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () {
-                                      final initialDue = dueMs != null ? DateTime.fromMillisecondsSinceEpoch(dueMs) : null;
-                                      TaskDialog(
-                                        todoService: widget.todoService,
-                                        initialTitle: todo['title'],
-                                        initialDescription: todo['description'],
-                                        initialDueDate: initialDue,
-                                        initialGroupId: todo['groupId'],
-                                        onSave: (title, description, dueDate, groupId) {
-                                          widget.todoService.editTask(realIndex, title, description, dueDate, groupId);
-                                        },
-                                        dialogTitle: 'Edit Task',
-                                        saveButtonText: 'Update',
-                                      ).show(context);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () {
-                                      widget.todoService.deleteTask(realIndex);
-                                    },
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 15.0),
-                                  ),
-                                ],
-                              ),
+                              todoService: widget.todoService,
+                              box: box,
+                              realIndex: realIndex,
+                              todo: todo.cast<String, dynamic>(),
+                              showDragHandle: true,
                             );
                           },
                         )
@@ -233,108 +144,13 @@ class _TodoBuilderState extends State<TodoBuilder> {
                           itemBuilder: (context, idx) {
                             final int realIndex = filteredIndices[idx];
                             final todo = box.getAt(realIndex)!;
-                            String dueStr = '';
-                            final dueMs = todo['dueDate'] as int?;
-                            if (dueMs != null) {
-                              final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
-                              dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
-                            }
-
-                            bool isDueToday = false;
-                            if (dueMs != null) {
-                              final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
-                              final now = DateTime.now();
-                              isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
-                            }
-
-                            int? groupId = todo['groupId'] as int?;
-                            Color? taskColor;
-                            if (groupId != null) {
-                              final group = widget.todoService.groupBox.getAt(groupId);
-                              taskColor = group != null ? Color(group['color'] as int) : null;
-                            }
-
-                            return ListTile(
+                            return TaskTile(
                               key: ValueKey(todo['id']),
-                              title: Text(
-                                todo['title'] ?? '',
-                                style: TextStyle(
-                                  decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                              subtitle: Text(
-                                (todo['description'] ?? '') + dueStr,
-                                style: TextStyle(
-                                  decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                              leading: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (taskColor != null) ...[
-                                    Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: taskColor,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  Checkbox(
-                                    value: todo['isDone'] ?? false,
-                                    onChanged: (value) {
-                                      final updatedTodo = Map<String, dynamic>.from(todo);
-                                      final newIsDone = value ?? false;
-                                      updatedTodo['isDone'] = newIsDone;
-                                      if (newIsDone) {
-                                        if (updatedTodo['completedAt'] == null) {
-                                          updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                                        }
-                                      } else {
-                                        updatedTodo['completedAt'] = null;
-                                      }
-                                      box.putAt(realIndex, updatedTodo);
-                                    },
-                                  ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(isDueToday ? Icons.today : Icons.calendar_month_outlined),
-                                    onPressed: () {
-                                      widget.todoService.toggleDueToday(realIndex);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () {
-                                      final initialDue = dueMs != null ? DateTime.fromMillisecondsSinceEpoch(dueMs) : null;
-                                      TaskDialog(
-                                        todoService: widget.todoService,
-                                        initialTitle: todo['title'],
-                                        initialDescription: todo['description'],
-                                        initialDueDate: initialDue,
-                                        initialGroupId: todo['groupId'],
-                                        onSave: (title, description, dueDate, groupId) {
-                                          widget.todoService.editTask(realIndex, title, description, dueDate, groupId);
-                                        },
-                                        dialogTitle: 'Edit Task',
-                                        saveButtonText: 'Update',
-                                      ).show(context);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () {
-                                      widget.todoService.deleteTask(realIndex);
-                                    },
-                                  ),
-                                ],
-                              ),
+                              todoService: widget.todoService,
+                              box: box,
+                              realIndex: realIndex,
+                              todo: todo.cast<String, dynamic>(),
+                              showDragHandle: false,
                             );
                           },
                         )),

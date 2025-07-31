@@ -9,15 +9,18 @@ import 'package:hive_flutter/hive_flutter.dart';
 class TodoService {
   late Box<Map> _todoBox;
   late Box<Map> _groupBox;
+  late Box<String> _settingsBox;
 
   TodoService() {
     _todoBox = Hive.box<Map>('todos');
     _groupBox = Hive.box<Map>('groups');
+    _settingsBox = Hive.box<String>('settings');
     _migrateTodos();  // Add this call to run migration on init
   }
 
   Box<Map> get todoBox => _todoBox;
   Box<Map> get groupBox => _groupBox;
+  Box<String> get settingsBox => _settingsBox;
 
   void _migrateTodos() {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -55,25 +58,74 @@ class TodoService {
         'completedAt': null,
         'groupId': groupId,
         'order': DateTime.now().millisecondsSinceEpoch.toDouble(),  // Add this line for sortable order
+        'subtasks': [], // List of {'title': String, 'isDone': bool}
       };
       _todoBox.add(todoMap);
     }
   }
 
-  void editTask(int index, String title, String description, DateTime dueDate, [int? groupId]) {
-  final current = _todoBox.getAt(index);
-  if (current != null) {
-    final updated = Map<String, dynamic>.from(current);
-    updated['title'] = title;
-    updated['description'] = description;
-    updated['dueDate'] = dueDate.millisecondsSinceEpoch;
-    if (groupId != null) {
-      updated['groupId'] = groupId;
+  void addSubtask(int taskIndex, String subTitle) {
+    if (subTitle.isNotEmpty) {
+      final current = _todoBox.getAt(taskIndex);
+      if (current != null) {
+        final updated = Map<String, dynamic>.from(current);
+        final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
+        subtasks.add({'title': subTitle, 'isDone': false});
+        updated['subtasks'] = subtasks;
+        _todoBox.putAt(taskIndex, updated);
+      }
     }
-    // Preserve isDone
-    _todoBox.putAt(index, updated);
   }
-}
+
+  void toggleSubtask(int taskIndex, int subIndex, bool isDone) {
+    final current = _todoBox.getAt(taskIndex);
+    if (current != null) {
+      final updated = Map<String, dynamic>.from(current);
+      final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
+      if (subIndex < subtasks.length) {
+        subtasks[subIndex]['isDone'] = isDone;
+        updated['subtasks'] = subtasks;
+        _todoBox.putAt(taskIndex, updated);
+      }
+    }
+  }
+
+  bool areAllSubtasksDone(int taskIndex) {
+    final current = _todoBox.getAt(taskIndex);
+    if (current != null) {
+      final subtasks = List<Map<String, dynamic>>.from(current['subtasks'] ?? []);
+      return subtasks.isNotEmpty && subtasks.every((sub) => sub['isDone'] == true);
+    }
+    return true;  // No subtasks = all "done"
+  }
+
+  void markAllSubtasksDone(int taskIndex) {
+    final current = _todoBox.getAt(taskIndex);
+    if (current != null) {
+      final updated = Map<String, dynamic>.from(current);
+      final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
+      for (var sub in subtasks) {
+        sub['isDone'] = true;
+      }
+      updated['subtasks'] = subtasks;
+      _todoBox.putAt(taskIndex, updated);
+    }
+  }
+
+  void editTask(int index, String title, String description, DateTime dueDate, [int? groupId]) {
+    final current = _todoBox.getAt(index);
+    if (current != null) {
+      final updated = Map<String, dynamic>.from(current);
+      updated['title'] = title;
+      updated['description'] = description;
+      updated['dueDate'] = dueDate.millisecondsSinceEpoch;
+      if (groupId != null) {
+        updated['groupId'] = groupId;
+      }
+      // Preserve isDone
+      _todoBox.putAt(index, updated);
+    }
+  }
 
 void deleteTask(int index) {
   _todoBox.deleteAt(index);

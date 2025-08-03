@@ -1,21 +1,29 @@
+// main.dart
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
 
+import './models/models.dart';
 import 'screens/home_screen.dart';
 
-void main() async{
+
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  await Hive.openBox<Map>('todos');
-  await Hive.openBox<Map>('groups');
-  await Hive.openBox<String>('settings');
-  // Add any necessary Hive adapter registrations here
-  runApp(const MyApp());
+
+  final dir = await getApplicationDocumentsDirectory();
+  final isar = await Isar.open(
+    [TodoSchema, GroupSchema, SettingSchema],
+    directory: dir.path,
+  );
+
+  runApp(MyApp(isar: isar));
 }
 
-
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Isar isar;
+
+  const MyApp({super.key, required this.isar});
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +32,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const HomeScreen(),
+      home: HomeScreen(isar: isar),
     );
   }
 }
-

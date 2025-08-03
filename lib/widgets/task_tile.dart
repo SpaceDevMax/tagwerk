@@ -1,20 +1,20 @@
+// widgets/task_tile.dart
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+
+import '../models/models.dart';
 import '../services/todo_service.dart';
 import 'task_dialog.dart';
 
 class TaskTile extends StatelessWidget {
   final TodoService todoService;
-  final Box<Map> box;
-  final int realIndex;
-  final Map<String, dynamic> todo;
+  final int todoId;
+  final Todo todo;
   final bool showDragHandle;
 
   const TaskTile({
     super.key,
     required this.todoService,
-    required this.box,
-    required this.realIndex,
+    required this.todoId,
     required this.todo,
     this.showDragHandle = false,
   });
@@ -22,13 +22,13 @@ class TaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String dueStr = '';
-    final dueMs = todo['dueDate'] as int?;
+    final dueMs = todo.dueDate;
     bool isOverdue = false;
     if (dueMs != null) {
       final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
       dueStr = ' - Due: ${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
       final today = DateTime.now();
-      isOverdue = !todo['isDone'] && due.isBefore(DateTime(today.year, today.month, today.day));
+      isOverdue = !todo.isDone && due.isBefore(DateTime(today.year, today.month, today.day));
     }
 
     bool isDueToday = false;
@@ -38,32 +38,30 @@ class TaskTile extends StatelessWidget {
       isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
     }
 
-    int? groupId = todo['groupId'] as int?;
+    int? groupId = todo.groupId;
     Color? taskColor;
     if (groupId != null) {
-      final group = todoService.groupBox.getAt(groupId);
-      taskColor = group != null ? Color(group['color'] as int) : null;
+      final group = todoService.isar.groups.getSync(groupId);
+      taskColor = group != null ? Color(group.color) : null;
     }
 
-    final subtasks = (todo['subtasks'] as List<dynamic>? ?? [])
-        .map((sub) => (sub as Map<dynamic, dynamic>).cast<String, dynamic>())
-        .toList();
-    final completedSubs = subtasks.where((sub) => sub['isDone'] == true).length;
+    final subtasks = todo.subtasks;
+    final completedSubs = subtasks.where((sub) => sub.isDone).length;
     final subCountStr = subtasks.isNotEmpty ? ' | Subtasks: $completedSubs/${subtasks.length}' : '';
 
     return ExpansionTile(
-      key: ValueKey(todo['id']),
+      key: ValueKey(todo.id),
       title: Text(
-        todo['title'] ?? '',
+        todo.title,
         style: TextStyle(
-          decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
+          decoration: todo.isDone ? TextDecoration.lineThrough : null,
           color: isOverdue ? const Color.fromARGB(255, 122, 10, 1) : null,
         ),
       ),
       subtitle: Text(
-        (todo['description'] ?? '') + dueStr + subCountStr,
+        (todo.description) + dueStr + subCountStr,
         style: TextStyle(
-          decoration: todo['isDone'] == true ? TextDecoration.lineThrough : null,
+          decoration: todo.isDone ? TextDecoration.lineThrough : null,
           color: isOverdue ? const Color.fromARGB(255, 122, 10, 1) : null,
         ),
       ),
@@ -82,10 +80,10 @@ class TaskTile extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Checkbox(
-            value: todo['isDone'] ?? false,
+            value: todo.isDone,
             onChanged: (value) async {
               final newIsDone = value ?? false;
-              if (newIsDone && subtasks.isNotEmpty && !todoService.areAllSubtasksDone(realIndex)) {
+              if (newIsDone && subtasks.isNotEmpty && !todoService.areAllSubtasksDone(todoId)) {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -98,25 +96,11 @@ class TaskTile extends StatelessWidget {
                   ),
                 );
                 if (confirm == true) {
-                  todoService.markAllSubtasksDone(realIndex);
-                  final updatedTodo = Map<String, dynamic>.from(todo);
-                  updatedTodo['isDone'] = true;
-                  if (updatedTodo['completedAt'] == null) {
-                    updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                  }
-                  box.putAt(realIndex, updatedTodo);
+                  todoService.markAllSubtasksDone(todoId);
+                  todoService.updateIsDone(todoId, true);
                 }
               } else {
-                final updatedTodo = Map<String, dynamic>.from(todo);
-                updatedTodo['isDone'] = newIsDone;
-                if (newIsDone) {
-                  if (updatedTodo['completedAt'] == null) {
-                    updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                  }
-                } else {
-                  updatedTodo['completedAt'] = null;
-                }
-                box.putAt(realIndex, updatedTodo);
+                todoService.updateIsDone(todoId, newIsDone);
               }
             },
           ),
@@ -128,21 +112,21 @@ class TaskTile extends StatelessWidget {
           IconButton(
             icon: Icon(isDueToday ? Icons.today : Icons.calendar_month_outlined),
             onPressed: () {
-              todoService.toggleDueToday(realIndex);
+              todoService.toggleDueToday(todoId);
             },
           ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              final initialDue = dueMs != null ? DateTime.fromMillisecondsSinceEpoch(dueMs) : null;
+              final initialDue = todo.dueDate != null ? DateTime.fromMillisecondsSinceEpoch(todo.dueDate!) : null;
               TaskDialog(
                 todoService: todoService,
-                initialTitle: todo['title'],
-                initialDescription: todo['description'],
+                initialTitle: todo.title,
+                initialDescription: todo.description,
                 initialDueDate: initialDue,
-                initialGroupId: todo['groupId'],
+                initialGroupId: todo.groupId,
                 onSave: (title, description, dueDate, groupId) {
-                  todoService.editTask(realIndex, title, description, dueDate, groupId);
+                  todoService.editTask(todoId, title, description, dueDate, groupId);
                 },
                 dialogTitle: 'Edit Task',
                 saveButtonText: 'Update',
@@ -152,7 +136,7 @@ class TaskTile extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.delete),
             onPressed: () {
-              todoService.deleteTask(realIndex);
+              todoService.deleteTask(todoId);
             },
           ),
           if (showDragHandle)
@@ -163,23 +147,18 @@ class TaskTile extends StatelessWidget {
         ],
       ),
       children: [
-        ...subtasks.asMap().entries.map((entry) {
+        ...todo.subtasks.asMap().entries.map((entry) {
           final subIdx = entry.key;
           final sub = entry.value;
           return ListTile(
-            title: Text(sub['title'] ?? ''),
+            title: Text(sub.title),
             leading: Checkbox(
-              value: sub['isDone'] ?? false,
+              value: sub.isDone,
               onChanged: (subValue) {
                 final newSubDone = subValue ?? false;
-                todoService.toggleSubtask(realIndex, subIdx, newSubDone);
-                if (newSubDone && todoService.areAllSubtasksDone(realIndex) && !(todo['isDone'] ?? false)) {
-                  final updatedTodo = Map<String, dynamic>.from(todo);
-                  updatedTodo['isDone'] = true;
-                  if (updatedTodo['completedAt'] == null) {
-                    updatedTodo['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-                  }
-                  box.putAt(realIndex, updatedTodo);
+                todoService.toggleSubtask(todoId, subIdx, newSubDone);
+                if (newSubDone && todoService.areAllSubtasksDone(todoId) && !todo.isDone) {
+                  todoService.updateIsDone(todoId, true);
                 }
               },
             ),
@@ -202,7 +181,7 @@ class TaskTile extends StatelessWidget {
                   TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
                   TextButton(
                     onPressed: () {
-                      todoService.addSubtask(realIndex, subController.text);
+                      todoService.addSubtask(todoId, subController.text);
                       Navigator.pop(dialogContext);
                     },
                     child: const Text('Add'),

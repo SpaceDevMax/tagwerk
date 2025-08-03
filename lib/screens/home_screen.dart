@@ -1,9 +1,18 @@
+// screens/home_screen.dart
 import 'package:flutter/material.dart';
-import '../services/export_to_home_screen.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:isar/isar.dart';
+
+
+import '../models/models.dart';
+import '../services/todo_service.dart';
+import '../widgets/task_dialog.dart';
+import '../widgets/todo_builder.dart';
+import 'overdue_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Isar isar;
+
+  const HomeScreen({super.key, required this.isar});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -12,12 +21,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TodoService _todoService = TodoService();
+  late final TodoService _todoService;
   var selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _todoService = TodoService(widget.isar);
   }
 
   @override
@@ -31,18 +41,21 @@ class _HomeScreenState extends State<HomeScreen> {
           body: Row(
             children: [
               SafeArea(
-                child: ValueListenableBuilder(
-                  valueListenable: _todoService.groupBox.listenable(),
-                  builder: (context, Box<Map> groupBox, _) {
-                    final groups = _todoService.getGroups();
+                child: StreamBuilder<List<Group>>(
+                  stream: _todoService.groupsStream,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final groups = snapshot.data!;
                     final destinations = <NavigationRailDestination>[
                       const NavigationRailDestination(icon: Icon(Icons.home), label: Text('Today')),
                       const NavigationRailDestination(icon: Icon(Icons.warning), label: Text('Overdue')),
                       const NavigationRailDestination(icon: Icon(Icons.circle), label: Text('Open')),
                       const NavigationRailDestination(icon: Icon(Icons.check_box), label: Text('Done')),
                     ] + groups.map((group) => NavigationRailDestination(
-                      icon: Icon(Icons.circle, color: Color(group['color'] as int)),
-                      label: Text(group['name'] as String),
+                      icon: Icon(Icons.circle, color: Color(group.color)),
+                      label: Text(group.name),
                     )).toList();
 
                     return NavigationRail(
@@ -70,7 +83,9 @@ class _HomeScreenState extends State<HomeScreen> {
               if (selectedIndex == 0) {
                 preDue = DateTime.now();
               } else if (selectedIndex >= 4) {
-                preGroup = selectedIndex - 4;
+                final groups = _todoService.getGroups();
+                final groupIndex = selectedIndex - 4;
+                preGroup = groups[groupIndex].id;
               }
               TaskDialog(
                 todoService: _todoService,
@@ -94,19 +109,19 @@ class _HomeScreenState extends State<HomeScreen> {
         return TodoBuilder(
           todoService: _todoService,
           filter: (todo) {
-            final dueMs = todo?['dueDate'] as int?;
+            final dueMs = todo.dueDate;
             if (dueMs == null) return false;
             final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
             final now = DateTime.now();
             final isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
             if (!isDueToday) return false;
 
-            final isDone = todo?['isDone'] == true;
+            final isDone = todo.isDone;
             if (!isDone) return true;  // Always include unfinished today tasks
 
             // Include done only if completed today
-            final completedMs = todo?['completedAt'] as int?;
-            if (completedMs == null) return false;  // Shouldn't happen, but safety
+            final completedMs = todo.completedAt;
+            if (completedMs == null) return false;
             final completed = DateTime.fromMillisecondsSinceEpoch(completedMs);
             return completed.year == now.year && completed.month == now.month && completed.day == now.day;
           },
@@ -114,27 +129,26 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       case 1:
         return OverdueScreen(todoService: _todoService);
-
       case 2:
         return TodoBuilder(
           todoService: _todoService,
-          filter: (todo) => todo?['isDone'] == false,
+          filter: (todo) => !todo.isDone,
           viewKey: 'open',
         );
-
       case 3:
         return TodoBuilder(
           todoService: _todoService,
-          filter: (todo) => todo?['isDone'] == true,
+          filter: (todo) => todo.isDone,
           viewKey: 'done',
         );
-
       default:
         final groupIndex = index - 4;
+        final groups = _todoService.getGroups();
+        final groupId = groups[groupIndex].id;
         return TodoBuilder(
           todoService: _todoService,
-          filter: (todo) => todo?['groupId'] == groupIndex,
-          viewKey: 'group_$groupIndex',
+          filter: (todo) => todo.groupId == groupId,
+          viewKey: 'group_$groupId',
         );
     }
   }

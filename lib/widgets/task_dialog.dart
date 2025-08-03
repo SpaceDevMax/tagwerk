@@ -1,8 +1,9 @@
+// widgets/task_dialog.dart
 import 'package:flutter/material.dart';
 
+import '../models/models.dart';
 import '../services/todo_service.dart';
-import '../widgets/group_dialog.dart';
- 
+import 'group_dialog.dart';
 
 class TaskDialog extends StatelessWidget {
   final TodoService todoService;
@@ -82,20 +83,18 @@ class TaskDialog extends StatelessWidget {
                   DropdownButton<int?>(
                     value: selectedGroupId,
                     hint: const Text('Select Group'),
-                    items: todoService.getGroups().asMap().entries.map((entry) {
-                      int idx = entry.key;
-                      Map<String, dynamic> group = entry.value;
+                    items: todoService.getGroups().map((group) {
                       return DropdownMenuItem<int?>(
-                        value: idx,
+                        value: group.id,
                         child: Row(
                           children: [
                             Container(
                               width: 16,
                               height: 16,
-                              color: Color(group['color'] as int),
+                              color: Color(group.color),
                             ),
                             const SizedBox(width: 8),
-                            Text(group['name'] as String),
+                            Text(group.name),
                           ],
                         ),
                       );
@@ -106,15 +105,15 @@ class TaskDialog extends StatelessWidget {
                       if (value == -1) {
                         GroupDialog(
                           todoService: todoService,
-                          onSave:(name, color) {
-                            todoService.addGroup(name, color);
-                            dialogSetState((){
-                              selectedGroupId = todoService.groupBox.length - 1;
+                          onSave: (name, color) {
+                            final newId = todoService.addGroup(name, color);
+                            dialogSetState(() {
+                              selectedGroupId = newId;
                             });
                           },
                         ).show(dialogContext);
                       } else {
-                      dialogSetState(() => selectedGroupId = value);
+                        dialogSetState(() => selectedGroupId = value);
                       }
                     },
                   ),
@@ -154,7 +153,6 @@ class TaskDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // This widget is meant to be used via its show() method, not built directly
     return const SizedBox.shrink();
   }
 }

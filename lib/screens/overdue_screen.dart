@@ -1,4 +1,6 @@
+// screens/overdue_screen.dart
 import 'package:flutter/material.dart';
+
 import '../services/todo_service.dart';
 import '../widgets/todo_builder.dart';
 
@@ -12,11 +14,11 @@ class OverdueScreen extends StatelessWidget {
     return TodoBuilder(
       todoService: todoService,
       filter: (todo) {
-        final dueMs = todo?['dueDate'] as int?;
+        final dueMs = todo.dueDate;
         if (dueMs == null) return false;
         final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
         final today = DateTime.now();
-        return !todo?['isDone'] && due.isBefore(DateTime(today.year, today.month, today.day));
+        return !todo.isDone && due.isBefore(DateTime(today.year, today.month, today.day));
       },
       viewKey: 'overdue',
     );

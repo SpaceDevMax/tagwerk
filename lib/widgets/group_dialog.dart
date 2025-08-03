@@ -1,3 +1,4 @@
+// widgets/group_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
@@ -19,7 +20,7 @@ class GroupDialog extends StatelessWidget {
 
   void show(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
-    Color selectedColor = Colors.blue;  // Default color
+    Color selectedColor = Colors.blue;
 
     showDialog(
       context: context,
@@ -78,7 +79,6 @@ class GroupDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // This widget is meant to be used via its show() method, not built directly
     return const SizedBox.shrink();
   }
 }

@@ -1,211 +1,207 @@
-// Hive logic
-//Manage adding, editing and deleting tasks
-
-
+// services/todo_service.dart
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:isar/isar.dart';
+
+import '../models/models.dart';
 
 class TodoService {
-  late Box<Map> _todoBox;
-  late Box<Map> _groupBox;
-  late Box<String> _settingsBox;
+  final Isar isar;
 
-  TodoService() {
-    _todoBox = Hive.box<Map>('todos');
-    _groupBox = Hive.box<Map>('groups');
-    _settingsBox = Hive.box<String>('settings');
-    _migrateTodos();  // Add this call to run migration on init
-  }
+  TodoService(this.isar);
 
-  Box<Map> get todoBox => _todoBox;
-  Box<Map> get groupBox => _groupBox;
-  Box<String> get settingsBox => _settingsBox;
+  Stream<List<Group>> get groupsStream => isar.groups.where().watch(fireImmediately: true);
 
-  void _migrateTodos() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    for (int i = 0; i < _todoBox.length; i++) {
-      final todo = _todoBox.getAt(i);
-      if (todo != null) {
-        final updatedTodo = Map<String, dynamic>.from(todo);
-        bool changed = false;
-        if (updatedTodo['id'] == null) {
-          updatedTodo['id'] = '$now$i';  // Unique ID based on timestamp + index
-          changed = true;
-        }
-        if (updatedTodo['order'] == null) {
-          updatedTodo['order'] = now.toDouble() + i;  // Set order based on current position/timestamp
-          changed = true;
-        }
-        if (changed) {
-          _todoBox.putAt(i, updatedTodo);
-        }
-        if (updatedTodo['savedDueDate'] == null) {
-          // No need to set, defaults to null
-        }
-      }
-    }
-  }
-
+  
   void addTask(String title, String description, DateTime dueDate, [int? groupId]) {
     if (title.isNotEmpty) {
-      final todoMap = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(), // Unique ID
-        'title': title,
-        'description': description,
-        'isDone': false,
-        'dueDate': dueDate.millisecondsSinceEpoch,
-        'completedAt': null,
-        'groupId': groupId,
-        'order': DateTime.now().millisecondsSinceEpoch.toDouble(),  // Add this line for sortable order
-        'subtasks': [], // List of {'title': String, 'isDone': bool}
-      };
-      _todoBox.add(todoMap);
+      final todo = Todo(
+        title: title,
+        description: description,
+        isDone: false,
+        dueDate: dueDate.millisecondsSinceEpoch,
+        completedAt: null,
+        groupId: groupId,
+        order: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        subtasks: [],
+        savedDueDate: null,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      isar.writeTxnSync(() => isar.todos.putSync(todo));
     }
   }
 
-  void addSubtask(int taskIndex, String subTitle) {
+  void addSubtask(int todoId, String subTitle) {
     if (subTitle.isNotEmpty) {
-      final current = _todoBox.getAt(taskIndex);
-      if (current != null) {
-        final updated = Map<String, dynamic>.from(current);
-        final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
-        subtasks.add({'title': subTitle, 'isDone': false});
-        updated['subtasks'] = subtasks;
-        _todoBox.putAt(taskIndex, updated);
+      isar.writeTxnSync(() {
+        final todo = isar.todos.getSync(todoId);
+        if (todo != null) {
+          todo.subtasks.add(Subtask(title: subTitle, isDone: false));
+          isar.todos.putSync(todo);
+        }
+      });
+    }
+  }
+
+  void toggleSubtask(int todoId, int subIndex, bool isDone) {
+    isar.writeTxnSync(() {
+      final todo = isar.todos.getSync(todoId);
+      if (todo != null && subIndex < todo.subtasks.length) {
+        todo.subtasks[subIndex].isDone = isDone;
+        isar.todos.putSync(todo);
       }
-    }
+    });
   }
 
-  void toggleSubtask(int taskIndex, int subIndex, bool isDone) {
-    final current = _todoBox.getAt(taskIndex);
-    if (current != null) {
-      final updated = Map<String, dynamic>.from(current);
-      final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
-      if (subIndex < subtasks.length) {
-        subtasks[subIndex]['isDone'] = isDone;
-        updated['subtasks'] = subtasks;
-        _todoBox.putAt(taskIndex, updated);
+  bool areAllSubtasksDone(int todoId) {
+    final todo = isar.todos.getSync(todoId);
+    if (todo != null) {
+      return todo.subtasks.isNotEmpty && todo.subtasks.every((sub) => sub.isDone);
+    }
+    return true;
+  }
+
+  void markAllSubtasksDone(int todoId) {
+    isar.writeTxnSync(() {
+      final todo = isar.todos.getSync(todoId);
+      if (todo != null) {
+        for (var sub in todo.subtasks) {
+          sub.isDone = true;
+        }
+        isar.todos.putSync(todo);
       }
-    }
+    });
   }
 
-  bool areAllSubtasksDone(int taskIndex) {
-    final current = _todoBox.getAt(taskIndex);
-    if (current != null) {
-      final subtasks = List<Map<String, dynamic>>.from(current['subtasks'] ?? []);
-      return subtasks.isNotEmpty && subtasks.every((sub) => sub['isDone'] == true);
-    }
-    return true;  // No subtasks = all "done"
-  }
-
-  void markAllSubtasksDone(int taskIndex) {
-    final current = _todoBox.getAt(taskIndex);
-    if (current != null) {
-      final updated = Map<String, dynamic>.from(current);
-      final subtasks = List<Map<String, dynamic>>.from(updated['subtasks'] ?? []);
-      for (var sub in subtasks) {
-        sub['isDone'] = true;
+  void editTask(int todoId, String title, String description, DateTime dueDate, [int? groupId]) {
+    isar.writeTxnSync(() {
+      final todo = isar.todos.getSync(todoId);
+      if (todo != null) {
+        todo.title = title;
+        todo.description = description;
+        todo.dueDate = dueDate.millisecondsSinceEpoch;
+        if (groupId != null) {
+          todo.groupId = groupId;
+        }
+        isar.todos.putSync(todo);
       }
-      updated['subtasks'] = subtasks;
-      _todoBox.putAt(taskIndex, updated);
-    }
+    });
   }
 
-  void editTask(int index, String title, String description, DateTime dueDate, [int? groupId]) {
-    final current = _todoBox.getAt(index);
-    if (current != null) {
-      final updated = Map<String, dynamic>.from(current);
-      updated['title'] = title;
-      updated['description'] = description;
-      updated['dueDate'] = dueDate.millisecondsSinceEpoch;
-      if (groupId != null) {
-        updated['groupId'] = groupId;
+  void deleteTask(int todoId) {
+    isar.writeTxnSync(() => isar.todos.deleteSync(todoId));
+  }
+
+  void updateIsDone(int todoId, bool isDone) {
+    isar.writeTxnSync(() {
+      final todo = isar.todos.getSync(todoId);
+      if (todo != null) {
+        int? completedAt = todo.completedAt;
+        if (isDone && !todo.isDone) {
+          completedAt = DateTime.now().millisecondsSinceEpoch;
+        } else if (!isDone) {
+          completedAt = null;
+        }
+        todo.isDone = isDone;
+        todo.completedAt = completedAt;
+        isar.todos.putSync(todo);
       }
-      // Preserve isDone
-      _todoBox.putAt(index, updated);
-    }
+    });
   }
 
-void deleteTask(int index) {
-  _todoBox.deleteAt(index);
-}
-
-void updateIsDone(int index, bool isDone) {
-  final current = _todoBox.getAt(index);
-  if (current != null) {
-    final updated = Map<String, dynamic>.from(current);
-    if (isDone && !(updated['isDone'] ?? false)) {
-      // Set completedAt only when newly marking as done
-      updated['completedAt'] = DateTime.now().millisecondsSinceEpoch;
-    } else if (!isDone) {
-      // Clear completedAt when unmarking
-      updated['completedAt'] = null;
-    }
-    updated['isDone'] = isDone;
-    _todoBox.putAt(index, updated);
+  void toggleDueToday(int todoId) {
+    isar.writeTxnSync(() {
+      final todo = isar.todos.getSync(todoId);
+      if (todo != null) {
+        final dueMs = todo.dueDate;
+        final savedMs = todo.savedDueDate;
+        final now = DateTime.now();
+        final todayMs = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+        bool isDueToday = false;
+        if (dueMs != null) {
+          final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
+          isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
+        }
+        if (!isDueToday) {
+          todo.savedDueDate = dueMs;
+          todo.dueDate = todayMs;
+        } else {
+          todo.dueDate = savedMs;
+          todo.savedDueDate = null;
+        }
+        isar.todos.putSync(todo);
+      }
+    });
   }
-}
 
-void toggleDueToday(int index) {
-  final current = _todoBox.getAt(index);
-  if (current != null) {
-    final updated = Map<String, dynamic>.from(current);
-    final dueMs = updated['dueDate'] as int?;
-    final savedMs = updated['savedDueDate'] as int?;
-    final now = DateTime.now();
-    final todayMs = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    bool isDueToday = false;
-    if (dueMs != null) {
-      final due = DateTime.fromMillisecondsSinceEpoch(dueMs);
-      isDueToday = due.year == now.year && due.month == now.month && due.day == now.day;
-    }
-    if (!isDueToday) {
-      updated['savedDueDate'] = dueMs;  // Save old due (null if none)
-      updated['dueDate'] = todayMs;
-    } else {
-      if (savedMs != null) {
-        updated['dueDate'] = savedMs;
+  int addGroup(String name, Color color) {
+    final group = Group(name: name, color: color.value);
+    return isar.writeTxnSync(() => isar.groups.putSync(group));
+  }
+
+  List<Group> getGroups() {
+    return isar.groups.where().findAllSync();
+  }
+
+  void editGroup(int groupId, String name, Color color) {
+    isar.writeTxnSync(() {
+      final group = isar.groups.getSync(groupId);
+      if (group != null) {
+        group.name = name;
+        group.color = color.value;
+        isar.groups.putSync(group);
+      }
+    });
+  }
+
+  void deleteGroup(int groupId) {
+    isar.writeTxnSync(() {
+      final todosToUpdate = isar.todos.where().groupIdEqualTo(groupId).findAllSync();
+      for (var todo in todosToUpdate) {
+        todo.groupId = null;
+        isar.todos.putSync(todo);
+      }
+      isar.groups.deleteSync(groupId);
+    });
+  }
+
+  String? getSetting(String key) {
+    return isar.settings.where().keyEqualTo(key).findFirstSync()?.value;
+  }
+
+  void setSetting(String key, String value) {
+    isar.writeTxnSync(() {
+      var setting = isar.settings.where().keyEqualTo(key).findFirstSync();
+      if (setting == null) {
+        setting = Setting(key: key, value: value);
       } else {
-        updated['dueDate'] = null;  // For original today tasks, remove due date
+        setting.value = value;
       }
-      updated.remove('savedDueDate');
-    }
-    _todoBox.putAt(index, updated);
-  }
-}
-
-void addGroup(String name, Color color) {
-    groupBox.add({'name': name, 'color': color.value});
+      isar.settings.putSync(setting);
+    });
   }
 
-  // Method to get all groups as list of maps
-  List<Map<String, dynamic>> getGroups() {
-    return _groupBox.values.map((map) => map.cast<String, dynamic>()).toList();  
-    }
-
-  // Method to edit a group (by index)
-  void editGroup(int index, String name, Color color) {
-    final updatedGroup = Map<String, dynamic>.from(groupBox.getAt(index) ?? {});
-    updatedGroup['name'] = name;
-    updatedGroup['color'] = color.value;
-    groupBox.putAt(index, updatedGroup);
+  Stream<List<Todo>> getFilteredTodosStream(bool Function(Todo)? filter, String sortOption) {
+    return isar.todos.where().build().watch(fireImmediately: true).map((todos) {
+      var filtered = todos.where(filter ?? (t) => true).toList();
+      filtered.sort((a, b) {
+        if (sortOption == 'custom') {
+          return a.order.compareTo(b.order);
+        }
+        switch (sortOption) {
+          case 'created_desc':
+            return b.createdAt.compareTo(a.createdAt);
+          case 'created_asc':
+            return a.createdAt.compareTo(b.createdAt);
+          case 'due_asc':
+            final large = 9223372036854775807;
+            final aDue = a.dueDate ?? large;
+            final bDue = b.dueDate ?? large;
+            return aDue.compareTo(bDue);
+          default:
+            return 0;
+        }
+      });
+      return filtered;
+    });
   }
-
-  // Method to delete a group (and unassign tasks from it)
-  void deleteGroup(int index) {
-    final groupId = index;  // Assuming index is the key
-    // Unassign tasks belonging to this group
-    for (int i = 0; i < todoBox.length; i++) {
-      final todo = todoBox.getAt(i);
-      if (todo?['groupId'] == groupId) {
-        final updatedTodo = Map<String, dynamic>.from(todo ?? {});
-        updatedTodo.remove('groupId');
-        todoBox.putAt(i, updatedTodo);
-      }
-    }
-    groupBox.deleteAt(index);
-  }
-
-  // Add more methods here later, e.g., for delete or update if needed
 }

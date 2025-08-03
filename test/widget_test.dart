@@ -9,12 +9,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:tagwerk/main.dart';
+import 'dart:io';
+import 'package:isar/isar.dart';
+import 'package:tagwerk/models/models.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
+    final dir = Directory.systemTemp.createTempSync();
+    final isar = await Isar.open(
+      [TodoSchema, GroupSchema, SettingSchema],
+      directory: dir.path,
+    );
+    await tester.pumpWidget(MyApp(isar: isar));
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);
     expect(find.text('1'), findsNothing);

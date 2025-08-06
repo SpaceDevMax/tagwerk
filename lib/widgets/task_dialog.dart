@@ -105,11 +105,11 @@ class TaskDialog extends StatelessWidget {
                       if (value == -1) {
                         GroupDialog(
                           todoService: todoService,
-                          onSave: (name, color) {
-                            final newId = todoService.addGroup(name, color);
-                            dialogSetState(() {
-                              selectedGroupId = newId;
-                            });
+                          onSave: (name, color) async {
+                                final newId = await todoService.addGroup(name, color);
+                                dialogSetState(() {
+                                  selectedGroupId = newId;
+                                });
                           },
                         ).show(dialogContext);
                       } else {

@@ -34,7 +34,8 @@ dependencies:
   isar_flutter_libs: ^3.1.0
   path_provider: ^2.0.14
   flutter_colorpicker: ^1.1.0
-
+  supabase_flutter: ^2.0.0
+  
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -44,7 +45,7 @@ dev_dependencies:
     sdk: flutter
   build_runner: ^2.4.12
   isar_generator: ^3.1.0
-  
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

@@ -1,13 +1,15 @@
 // screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Add this import for auth
 
-
+import '../main.dart'; // Add this to access supabase
 import '../models/models.dart';
 import '../services/todo_service.dart';
 import '../widgets/task_dialog.dart';
 import '../widgets/todo_builder.dart';
 import 'overdue_screen.dart';
+import 'auth_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final Isar isar;
@@ -28,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _todoService = TodoService(widget.isar);
+    _todoService.startSync();
   }
 
   @override
@@ -37,6 +40,19 @@ class _HomeScreenState extends State<HomeScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Tagwerk'),
+            actions: [
+              IconButton(
+                onPressed: () async {
+                  await supabase.auth.signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => AuthPage(isar: widget.isar)),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.logout),
+              ),
+            ],
           ),
           body: Row(
             children: [

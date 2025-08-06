@@ -73,7 +73,7 @@ class _TodoBuilderState extends State<TodoBuilder> {
                               newIndex -= 1;
                             }
                             final todo = todos[oldIndex];
-                            double newOrder;
+                            int newOrder;
                             if (originalNewIndex == todos.length) {
                               newOrder = todos.last.order + 1;
                             } else if (newIndex == 0) {
@@ -81,7 +81,7 @@ class _TodoBuilderState extends State<TodoBuilder> {
                             } else {
                               final prevOrder = todos[newIndex - 1].order;
                               final nextOrder = todos[newIndex].order;
-                              newOrder = (prevOrder + nextOrder) / 2;
+                              newOrder = (prevOrder + nextOrder) ~/ 2;
                             }
                             widget.todoService.isar.writeTxnSync(() {
                               todo.order = newOrder;

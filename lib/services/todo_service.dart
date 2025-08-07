@@ -138,7 +138,7 @@ class TodoService {
     });
   }
 
-  Future<void> addTask(String title, String description, DateTime dueDate, [int? groupId]) async {
+  Future<void> addTask(String title, String description, DateTime dueDate, List<Subtask> subtasks, [int? groupId]) async {
     if (title.isNotEmpty) {
       final currentUser = supabase.auth.currentUser;
       final todoJson = {
@@ -149,7 +149,7 @@ class TodoService {
         'completed_at': null,
         'group_id': groupId,
         'order': DateTime.now().millisecondsSinceEpoch,
-        'subtasks': [],
+        'subtasks': subtasks.map((s) => s.toJson()).toList(),
         'saved_due_date': null,
         'created_at': DateTime.now().millisecondsSinceEpoch,
         'user_id': currentUser!.id,
@@ -215,7 +215,7 @@ class TodoService {
     }
   }
 
-  Future<void> editTask(int todoId, String title, String description, DateTime dueDate, [int? groupId]) async {
+  Future<void> editTask(int todoId, String title, String description, DateTime dueDate, List<Subtask> subtasks, [int? groupId]) async {
     Todo? todo;
     isar.writeTxnSync(() {
       todo = isar.todos.getSync(todoId);
@@ -226,6 +226,7 @@ class TodoService {
         if (groupId != null) {
           todo!.groupId = groupId;
         }
+        todo!.subtasks = subtasks;
         isar.todos.putSync(todo!);
       }
     });

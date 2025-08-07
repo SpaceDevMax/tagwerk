@@ -91,18 +91,17 @@ class Todo {
 
   factory Todo.fromJson(Map<String, dynamic> json) {
     return Todo(
-      title: json['title'] as String,
-      description: json['description'] as String,
-      isDone: json['is_done'] as bool? ??false,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      isDone: json['is_done'] as bool? ?? false,
       dueDate: json['due_date'] as int?,
       completedAt: json['completed_at'] as int?,
       groupId: json['group_id'] as int?,
-      order: json['order'] as int,
-      subtasks: (json['subtasks'] as List).map((s) => Subtask.fromJson(s)).toList(),
+      order: json['order'] as int,      subtasks: (json['subtasks'] as List? ?? []).map((s) => Subtask.fromJson(s)).toList(),
       savedDueDate: json['saved_due_date'] as int?,
-      createdAt: json['created_at'] as int,
-      userId: json['user_id'] as String,
-    )..id = json['id'] as int;
+      createdAt: json['created_at'] as int? ?? 0,
+      userId: json['user_id'] as String? ?? '',
+    )..id = json['id'] as int? ?? 0;
   }
 }
 
@@ -133,8 +132,8 @@ class Subtask {
 
   factory Subtask.fromJson(Map<String, dynamic> json) {
     return Subtask(
-      title: json['title'] as String,
-      isDone: json['is_done'] as bool,
+      title: json['title'] as String? ?? '',
+      isDone: json['is_done'] as bool? ?? false,
     );
   }
 }
@@ -178,9 +177,9 @@ class Group {
 
   factory Group.fromJson(Map<String, dynamic> json) {
     return Group(
-      name: json['name'] as String,
-      color: json['color'] as int,
-      userId: json['user_id'] as String,
+      name: json['name'] as String? ?? '',
+      color: json['color'] as int? ?? 0,
+      userId: json['user_id'] as String? ?? '',
     )..id = json['id'] as int;
   }
 }
@@ -207,11 +206,12 @@ class Setting {
     };
   }
 
+// In Setting.fromJson:
   factory Setting.fromJson(Map<String, dynamic> json) {
     return Setting(
-      key: json['key'] as String,
-      userId: json['user_id'] as String,
+      key: json['key'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
       value: json['value'] as String?,
-    )..id = json['id'] as int;
+    )..id = json['id'] as int? ?? 0;
   }
 }

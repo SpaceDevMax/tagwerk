@@ -125,8 +125,9 @@ class TaskTile extends StatelessWidget {
                 initialDescription: todo.description,
                 initialDueDate: initialDue,
                 initialGroupId: todo.groupId,
-                onSave: (title, description, dueDate, groupId) {
-                  todoService.editTask(todoId, title, description, dueDate, groupId);
+                initialSubtasks: todo.subtasks,
+                onSave: (title, description, dueDate, groupId, subtasks) {
+                  todoService.editTask(todoId, title, description, dueDate, subtasks, groupId);
                 },
                 dialogTitle: 'Edit Task',
                 saveButtonText: 'Update',

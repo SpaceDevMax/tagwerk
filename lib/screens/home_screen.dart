@@ -107,8 +107,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 todoService: _todoService,
                 initialDueDate: preDue,
                 initialGroupId: preGroup,
-                onSave: (title, description, dueDate, groupId) {
-                  _todoService.addTask(title, description, dueDate, groupId);
+                onSave: (title, description, dueDate, groupId, subtasks) {
+                  _todoService.addTask(title, description, dueDate, subtasks, groupId);
                 },
               ).show(context);
             },

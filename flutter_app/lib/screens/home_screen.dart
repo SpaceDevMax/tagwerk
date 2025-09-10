@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   var selectedIndex = 0;
   bool _isConnected = false; // Track server connection
   bool _isSynced = true; // Track sync status
+  Timer? _connectionTimer; //Store timer for cancellation
 
   @override
   void initState() {
@@ -38,16 +39,28 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkConnection() async {
     try {
       final response = await http.get(Uri.parse('${_todoService.serverUrl}/todos')).timeout(const Duration(seconds: 2));
-      setState(() {
+      if (mounted) { // Check if widget is still mounted
+        setState(() {
         _isConnected = response.statusCode == 200;
         _isSynced = true; // Assume synced if server reachable; refine with last sync time if needed
-      });
+  });
+}
     } catch (e) {
-      setState(() {
-        _isConnected = false;
-        _isSynced = false; // Not synced if server unreachable
-      });
+      if (mounted) { // Check if widget is still mounted
+        setState(() {
+          _isConnected = false;
+          _isSynced = false; // Not synced if server unreachable
+        });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _connectionTimer?.cancel(); // Cancel timer
+    _textController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -79,10 +92,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: StreamBuilder<List<Group>>(
                       stream: _todoService.groupsStream,
                       builder: (context, snapshot) {
+                        final groups = snapshot.data ?? [];
                         if (!snapshot.hasData) {
                           return const Center(child: CircularProgressIndicator());
                         }
-                        final groups = snapshot.data!;
                         final destinations = <NavigationRailDestination>[
                           const NavigationRailDestination(icon: Icon(Icons.home), label: Text('Today')),
                           const NavigationRailDestination(icon: Icon(Icons.warning), label: Text('Overdue')),
@@ -214,10 +227,4 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _textController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
 }

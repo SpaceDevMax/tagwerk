@@ -1,5 +1,5 @@
+// In flutter_app/lib/widgets/todo_builder.dart
 import 'package:flutter/material.dart';
-
 import '../models/models.dart';
 import '../services/todo_service.dart';
 import 'task_tile.dart';
@@ -21,7 +21,7 @@ class TodoBuilder extends StatefulWidget {
 }
 
 class _TodoBuilderState extends State<TodoBuilder> {
-  String _sortOption = 'due_asc'; // Initialize with default
+  String _sortOption = 'due_asc';
 
   @override
   void initState() {
@@ -41,10 +41,8 @@ class _TodoBuilderState extends State<TodoBuilder> {
     return StreamBuilder<List<Todo>>(
       stream: widget.todoService.getFilteredTodosStream(widget.filter, _sortOption),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final todos = snapshot.data!;
+        final todos = snapshot.data ?? [];
+        print('StreamBuilder todos: ${todos.length}'); // Debug
         return Column(
           children: [
             Row(

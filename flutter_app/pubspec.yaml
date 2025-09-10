@@ -1,0 +1,25 @@
+name: tagwerk
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.4.0  # Update from ^2.3.3
+  path: ^1.9.1     # Update from ^1.9.0
+  http: ^1.2.4     # Update from ^1.2.2
+  flutter_colorpicker: ^1.1.0
+  cupertino_icons: ^1.0.8
+  sqflite_common_ffi: ^2.3.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
